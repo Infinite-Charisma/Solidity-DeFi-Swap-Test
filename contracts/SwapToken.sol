@@ -1,34 +1,44 @@
 // SPDX-License-Identifier: UNLICENSED
+
 pragma solidity ^0.8.9;
 
-// Uncomment this line to use console.log
-// import "hardhat/console.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "./Interface/IUSDC.sol";
 
-contract Lock {
-    uint public unlockTime;
-    address payable public owner;
+contract SwapToken is ReentrancyGuard {
+    USDC public usdc;
 
-    event Withdrawal(uint amount, uint when);
+    mapping(address => uint256[3]) userBalance;
 
-    constructor(uint _unlockTime) payable {
-        require(
-            block.timestamp < _unlockTime,
-            "Unlock time should be in the future"
-        );
-
-        unlockTime = _unlockTime;
-        owner = payable(msg.sender);
+    constructor(address usdcContractAddress) {
+        usdc = USDC(usdcContractAddress);
     }
 
-    function withdraw() public {
-        // Uncomment this line, and the import of "hardhat/console.sol", to print a log in your terminal
-        // console.log("Unlock time is %o and block timestamp is %o", unlockTime, block.timestamp);
+    function depositFund(uint256 _amount) external {
+        require(
+            usdc.balanceOf(msg.sender) >= _amount,
+            "Not enough balance in user wallet"
+        );
 
-        require(block.timestamp >= unlockTime, "You can't withdraw yet");
-        require(msg.sender == owner, "You aren't the owner");
+        usdc.transferFrom(msg.sender, address(this), _amount);
 
-        emit Withdrawal(address(this).balance, block.timestamp);
+        userBalance[msg.sender][0] += _amount;
+    }
 
-        owner.transfer(address(this).balance);
+    function withdrawFundSet(uint256 _amount) external nonReentrant {
+        require(
+            usdc.balanceOf(address(this)) >= _amount,
+            "Not enough balance in the pool"
+        );
+        require(
+            userBalance[msg.sender][0] > _amount,
+            "You have not enough balance to withdraw"
+        );
+
+        usdc.approve(msg.sender, _amount);
+
+        usdc.transfer(msg.sender, _amount);
+
+        userBalance[msg.sender][0] -= _amount;
     }
 }
