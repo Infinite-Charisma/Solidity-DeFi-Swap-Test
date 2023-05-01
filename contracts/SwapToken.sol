@@ -3,6 +3,7 @@
 pragma solidity ^0.8.9;
 
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "./Interface/IUSDC.sol";
 import "./Interface/IUSDT.sol";
 import "./Interface/IDAI.sol";
@@ -10,13 +11,14 @@ import "./Interface/IUniswapV2Factory.sol";
 import "./Interface/IUniswapV2Pair.sol";
 import "./Interface/IUniswapV2Router.sol";
 
-contract SwapToken is ReentrancyGuard {
+contract SwapToken is ReentrancyGuard, Ownable {
     USDC public usdc;
     USDT public usdt;
     DAI public dai;
     UniswapV2Router public uniswapV2Router;
     UniswapV2Pair public uniswapV2Pair;
     UniswapV2Factory public uniswapV2Factory;
+    uint256 public ratio = 1000;
 
     mapping(address => uint256[3]) userBalance;
 
@@ -78,21 +80,33 @@ contract SwapToken is ReentrancyGuard {
                 usdc.balanceOf(msg.sender) >= _amountIn,
                 "Not enough balance in user wallet"
             );
-            usdc.transferFrom(msg.sender, address(this), _amountIn);
+            usdc.transferFrom(
+                msg.sender,
+                address(this),
+                (_amountIn * ratio) / 1000
+            );
             usdc.approve(UNISWAP_V2_ROUTER, _amountIn);
         } else if (_coinIdx == 1) {
             require(
                 usdt.balanceOf(msg.sender) >= _amountIn,
                 "Not enough balance in user wallet"
             );
-            usdt.transferFrom(msg.sender, address(this), _amountIn);
+            usdt.transferFrom(
+                msg.sender,
+                address(this),
+                (_amountIn * ratio) / 1000
+            );
             usdt.approve(UNISWAP_V2_ROUTER, _amountIn);
         } else {
             require(
                 dai.balanceOf(msg.sender) >= _amountIn,
                 "Not enough balance in user wallet"
             );
-            dai.transferFrom(msg.sender, address(this), _amountIn);
+            dai.transferFrom(
+                msg.sender,
+                address(this),
+                (_amountIn * ratio) / 1000
+            );
             dai.approve(UNISWAP_V2_ROUTER, _amountIn);
         }
 
@@ -139,6 +153,14 @@ contract SwapToken is ReentrancyGuard {
             path
         );
         return amountOutMins[path.length - 1];
+    }
+
+    function changeRatio(uint256 _newRatio) external onlyOwner {
+        ratio = _newRatio;
+    }
+
+    function calculateAPY() external view onlyOwner returns (uint256) {
+        return (1 + ratio / 365000) ** 365 - 1;
     }
 
     function withdrawFund(
